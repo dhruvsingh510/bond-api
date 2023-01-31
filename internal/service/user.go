@@ -11,7 +11,7 @@ import (
 var (
 	rxEmail            = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$`)
 	rxUsername         = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{3,30}$`)
-	ErrorUserNotFound  = errors.New("user not found")
+	ErrUserNotFound    = errors.New("user not found")
 	ErrInvalidEmail    = errors.New("invalid email")
 	ErrInvalidPassword = errors.New("invalid password")
 	ErrInvalidUsername = errors.New("invalid username")
@@ -24,7 +24,7 @@ var (
 type User struct {
 	ID       int64  `json:"id,omitempty"`
 	Username string `json:"username,omitempty"`
-	Password string `string:"password,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 // Inserts a new user in the database

@@ -2,17 +2,17 @@ package main
 
 import (
 	"context"
-	"net/http"
-	"log"
-	"github.com/jackc/pgx/v4"
 	"github.com/dhruvsingh510/bond_social_api/internal/handler"
 	"github.com/dhruvsingh510/bond_social_api/internal/service"
 	"github.com/hako/branca"
+	"github.com/jackc/pgx/v4"
+	"log"
+	"net/http"
 )
 
 const (
 	databaseURL = "postgres://postgres:admin@localhost:5432/postgres"
-	port = 8080
+	port        = 8080
 	// this key should be set as env variable
 	tokenKey = "supersecretkeyyoushouldnotcommit"
 )
@@ -32,9 +32,10 @@ func main() {
 	}
 
 	codec := branca.NewBranca(tokenKey)
+	codec.SetTTL(uint32(service.TokenLifespan.Seconds()))
 
 	s := &service.Service{
-		Db: db,
+		Db:    db,
 		Codec: codec,
 	}
 
