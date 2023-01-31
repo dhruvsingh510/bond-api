@@ -101,6 +101,5 @@ func (s *Service) AuthUser(ctx context.Context) (User, error) {
 
 	u.ID = uid
 
-	fmt.Println()
 	return u, nil
 }
