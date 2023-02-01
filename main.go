@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"log"
+	"net/http"
+
 	"github.com/dhruvsingh510/bond_social_api/internal/handler"
 	"github.com/dhruvsingh510/bond_social_api/internal/service"
 	"github.com/hako/branca"
 	"github.com/jackc/pgx/v4"
-	"log"
-	"net/http"
 )
 
 const (

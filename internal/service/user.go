@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -25,6 +26,13 @@ type User struct {
 	ID       int64  `json:"id,omitempty"`
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
+}
+
+// UserProfile model
+type UserProfile struct {
+	User  
+	Email string `json:"email,omitempty"`
+	Karma int64  `json:"karma"`
 }
 
 // Inserts a new user in the database
@@ -61,6 +69,36 @@ func (s *Service) CreateUser(ctx context.Context, email string, password string,
 	}
 
 	return nil
+}
+
+// User select on user from the database with the given username
+func (s *Service) User (ctx context.Context, username string) (UserProfile, error) {
+	var u UserProfile
+	
+	username = strings.TrimSpace(username)
+	if !rxUsername.MatchString(username) {
+		return u, ErrInvalidUsername
+	}
+
+	uid, auth := ctx.Value(KeyAuthUserID).(int64)
+
+	query := "SELECT id, email, karma FROM users WHERE username = $1"
+	err := s.Db.QueryRow(ctx, query, username).Scan(&u.ID, &u.Email, &u.Karma)
+	if err == sql.ErrNoRows {
+		return u, ErrUserNotFound
+	}
+
+	if err != nil {
+		return u, fmt.Errorf("could not query select user: %v", err)
+	}
+
+	u.Username = username
+	if !auth || uid != u.ID {
+		u.ID = 0
+		u.Email = ""
+	}
+
+	return u, nil
 }
 
 func (s *Service) ReadUsers(ctx context.Context) error {

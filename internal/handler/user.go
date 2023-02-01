@@ -3,7 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-
+	"github.com/matryer/way"
 	"github.com/dhruvsingh510/bond_social_api/internal/service"
 )
 
@@ -38,6 +38,31 @@ func (h *handler) createUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *handler) user(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	username := way.Param(ctx, "username")
+	u, err := h.User(ctx, username)
+
+	if err == service.ErrInvalidUsername {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	if err == service.ErrUserNotFound {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	respond(w, u, http.StatusOK)
+}
+
+
 func (h *handler) readUsers(w http.ResponseWriter, r *http.Request) {
 	h.ReadUsers(r.Context())
 }
+

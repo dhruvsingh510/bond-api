@@ -84,8 +84,8 @@ func(s *Service) Login(ctx context.Context, email string, password string) (Logi
 func (s *Service) AuthUser(ctx context.Context) (User, error) {
 	var u User
 
-	uid, ok := ctx.Value(KeyAuthUserID).(int64)
-	if !ok {
+	uid, auth := ctx.Value(KeyAuthUserID).(int64)
+	if !auth {
 		return u, ErrUnauthenticated
 	}
 
@@ -100,7 +100,6 @@ func (s *Service) AuthUser(ctx context.Context) (User, error) {
 	}
 
 	u.ID = uid
-
-	fmt.Println()
+	
 	return u, nil
 }
