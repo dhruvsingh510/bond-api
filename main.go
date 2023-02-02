@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/dhruvsingh510/bond_social_api/internal/handler"
 	"github.com/dhruvsingh510/bond_social_api/internal/service"
@@ -41,11 +42,10 @@ func main() {
 	}
 
 	h := handler.New(s)
-	// addr := fmt.Sprintf(":%d", port)
 
 	log.Printf("accepting connections on port %d\n", port)
 
-	if err = http.ListenAndServe(":8080", h); err != nil {
+	if err = http.ListenAndServe(":"+strconv.Itoa(port), h); err != nil {
 		log.Fatalf("could not start server: %v\n", err)
 	}
 }

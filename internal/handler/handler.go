@@ -20,10 +20,10 @@ func New(s *service.Service) http.Handler {
 	api.HandleFunc("POST", "/users", h.createUser)
 	api.HandleFunc("GET", "/getusers", h.readUsers)
 	api.HandleFunc("GET", "/users/:username", h.user)
+	api.HandleFunc("POST", "/posts", h.createPost)
 
 	r := way.NewRouter()
 	r.Handle("*", "/api...", http.StripPrefix("/api", h.withAuth(api)))
 
 	return r
-
 }
