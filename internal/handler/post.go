@@ -11,6 +11,8 @@ type createPostInput struct {
 	Title string
 	Body string
 	Link string
+	Album string
+	Poll string
 }
 
 func (h *handler) createPost(w http.ResponseWriter, r *http.Request) {
@@ -21,13 +23,13 @@ func (h *handler) createPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ti, err := h.CreatePost(r.Context(), in.Title, in.Body, in.Link)
+	ti, err := h.CreatePost(r.Context(), in.Title, in.Body, in.Link, in.Album, in.Poll)
 	if err == service.ErrUnauthenticated {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
-	if err == service.ErrInvalidTitle || err == service.ErrInvalidEmail || err == service.ErrInvalidBody {
+	if err == service.ErrInvalidTitle || err == service.ErrInvalidEmail || err == service.ErrInvalidBody || err == service.ErrNoContent {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
