@@ -67,7 +67,7 @@ func (s *Service) CreatePost(
 
 	var albumJSONB json.RawMessage
 	if album == "" {
-		albumJSONB = json.RawMessage("null")
+		albumJSONB = nil
 	} else {
 		err := json.Unmarshal([]byte(album), &albumJSONB)
 		if err != nil {
@@ -77,7 +77,7 @@ func (s *Service) CreatePost(
 
 	var pollJSONB json.RawMessage
 	if album == "" {
-		pollJSONB = json.RawMessage("null")
+		pollJSONB = nil
 	} else {
 		err := json.Unmarshal([]byte(album), &pollJSONB)
 		if err != nil {
@@ -104,23 +104,23 @@ func (s *Service) CreatePost(
 	ti.Post.Link = link
 
 	if album != "" {
-		ti.Post.Album = sql.NullString{
+		ti.Post.Album = sql.NullString {
 			String: album,
 			Valid:  true,
 		}
 	} else {
-		ti.Post.Album = sql.NullString{
+		ti.Post.Album = sql.NullString {
 			Valid: false,
 		}
 	}
 
 	if poll != "" {
-		ti.Post.Poll = sql.NullString{
+		ti.Post.Poll = sql.NullString {
 			String: poll,
 			Valid:  true,
 		}
 	} else {
-		ti.Post.Poll = sql.NullString{
+		ti.Post.Poll = sql.NullString {
 			Valid: false,
 		}
 	}
@@ -169,6 +169,17 @@ func (s *Service) Posts(
 		if err := rows.Scan(&post.Title, &post.Body, &post.Link, &post.Album, &post.Poll); err != nil {
 			return nil, fmt.Errorf("could not iterate over user posts: %v", err)
 		}
+
+		if post.Album.String == "null" {
+			post.Album.String = ""
+			post.Album.Valid = false
+		}
+
+		if post.Poll.String == "null" {
+			post.Poll.String = ""
+			post.Poll.Valid = false
+		}
+
 		posts = append(posts, post)
 	}
 
@@ -199,6 +210,16 @@ func (s *Service) Post(
 	err = s.Db.QueryRow(ctx, query, p_id).Scan(&p.Title, &p.Body, &p.Link, &p.Album, &p.Poll);
 	if err == sql.ErrNoRows {
 		return p, fmt.Errorf("could not sql query user post: %v", err)
+	}
+
+	if p.Album.String == "null" {
+		p.Album.String = ""
+		p.Album.Valid = false
+	}
+
+	if p.Poll.String == "null" {
+		p.Poll.String = ""
+		p.Poll.Valid = false
 	}
 
 	return p, nil
