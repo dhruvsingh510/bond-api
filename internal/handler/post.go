@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/dhruvsingh510/bond_social_api/internal/service"
+	"github.com/matryer/way"
 )
 
 type createPostInput struct {
@@ -42,3 +43,43 @@ func (h *handler) createPost(w http.ResponseWriter, r *http.Request) {
 	respond(w, ti, http.StatusCreated)
 }
 
+func (h *handler) posts(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	username := way.Param(ctx, "username")
+
+	pp, err := h.Posts(ctx, username) 
+
+	if err == service.ErrInvalidUsername {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	if err == service.ErrUnauthenticated {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if err != nil {
+		respondError(w, err)
+	}
+
+	respond(w, pp, http.StatusOK)
+}
+
+func (h *handler) post(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	postID := way.Param(ctx, "post_id")
+
+	p, err := h.Post(ctx, postID) 
+
+	if err == service.ErrUnauthenticated {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if err != nil {
+		respondError(w, err)
+	}
+
+	respond(w, p, http.StatusOK)
+}
