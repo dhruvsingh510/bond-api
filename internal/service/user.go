@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"encoding/json"
 )
 
 var (
@@ -30,9 +31,10 @@ type User struct {
 
 // UserProfile model
 type UserProfile struct {
-	User  
-	Email string `json:"email,omitempty"`
-	Karma int64  `json:"karma"`
+	User            `json:"user,omitempty"`
+	Email           string `json:"email,omitempty"`
+	InteractedPosts `json:"interacted_posts,omitempty"`
+	Karma           int64 `json:"karma,omitempty"`
 }
 
 // Inserts a new user in the database
@@ -52,8 +54,10 @@ func (s *Service) CreateUser(ctx context.Context, email string, password string,
 		return ErrHashingPass
 	}
 
-	query := "INSERT INTO users (email, password, username) VALUES ($1, $2, $3)"
-	_, err := s.Db.Exec(ctx, query, email, hash, username)
+	var interactedPostsJSONB json.RawMessage = nil
+
+	query := "INSERT INTO users (email, password, username, interacted_posts) VALUES ($1, $2, $3, $4)"
+	_, err := s.Db.Exec(ctx, query, email, hash, username, interactedPostsJSONB)
 	unique := isUniqueViolation(err)
 
 	if err != nil && !unique && strings.Contains(err.Error(), "email") {
@@ -123,3 +127,5 @@ func (s *Service) ReadUsers(ctx context.Context) error {
 
 	return nil
 }
+
+ 

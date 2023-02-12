@@ -20,3 +20,28 @@ func checkPasswordHash(password string, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
     return err == nil
 }
+
+func searchAndAppend(arr *[]int, val int) {
+	found := false
+	for _, v := range *arr {
+		if v == val {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		*arr = append(*arr, val)
+	}
+} 
+
+func searchAndDelete(arr *[]int, val int) {
+	for i, v := range *arr {
+		if v == val {
+			*arr = append((*arr)[:i], (*arr)[i+1:]...)
+			return
+		}
+	}
+
+	*arr = append(*arr, val)
+}

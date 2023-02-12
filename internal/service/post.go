@@ -16,6 +16,7 @@ var (
 	ErrInvalidBody  = errors.New("invalid body")
 	ErrInvalidLink  = errors.New("invalid link")
 	ErrNoContent    = errors.New("error: no content to post")
+	ErrInvalidPostID = errors.New("error: no such post id exits")
 )
 
 // Post Model
@@ -29,6 +30,13 @@ type Post struct {
 	Poll      sql.NullString `json:"poll,omitempty"`
 	CreatedAt time.Time      `json:"created_at,omitempty"`
 	User      *User          `json:"user,omitempty"`
+}
+
+type InteractedPosts struct {
+	Upvotes   []int `json:"upvotes,omitempty"`
+	Downvotes []int `json:"downvotes,omitempty"`
+	Comments  []int `json:"comments,omitempty"`
+	Saved     []int `json:"saved,omitempty"`
 }
 
 func (s *Service) CreatePost(
@@ -71,7 +79,7 @@ func (s *Service) CreatePost(
 	} else {
 		err := json.Unmarshal([]byte(album), &albumJSONB)
 		if err != nil {
-			return ti, fmt.Errorf("error converting string to jsonb: %v", err)
+			return ti, fmt.Errorf("error converting album string to jsonb: %v", err)
 		}
 	}
 
@@ -81,7 +89,7 @@ func (s *Service) CreatePost(
 	} else {
 		err := json.Unmarshal([]byte(album), &pollJSONB)
 		if err != nil {
-			return ti, fmt.Errorf("error converting string to jsonb: %v", err)
+			return ti, fmt.Errorf("error converting poll string to jsonb: %v", err)
 		}
 	}
 
@@ -195,19 +203,19 @@ func (s *Service) Post(
 
 	p_id, err := strconv.Atoi(postID)
 	if err != nil {
-		return p, fmt.Errorf("could not convert post string to int: %v", err) 
+		return p, fmt.Errorf("could not convert post string to int: %v", err)
 	}
 
 	uid, auth := ctx.Value(KeyAuthUserID).(int64)
 	if !auth {
 		return p, ErrUnauthenticated
 	}
-	
+
 	_ = uid
 
 	query := "SELECT title, body, link, album, poll FROM posts WHERE id = $1"
 
-	err = s.Db.QueryRow(ctx, query, p_id).Scan(&p.Title, &p.Body, &p.Link, &p.Album, &p.Poll);
+	err = s.Db.QueryRow(ctx, query, p_id).Scan(&p.Title, &p.Body, &p.Link, &p.Album, &p.Poll)
 	if err == sql.ErrNoRows {
 		return p, fmt.Errorf("could not sql query user post: %v", err)
 	}
@@ -223,4 +231,95 @@ func (s *Service) Post(
 	}
 
 	return p, nil
+}
+
+func (s *Service) PostEngagement(ctx context.Context,
+	postID string,
+	action string,
+) error {
+
+	uid, auth := ctx.Value(KeyAuthUserID).(int64)
+	if !auth {
+		return ErrUnauthenticated
+	}
+
+	pid, err := strconv.Atoi(postID)
+	if err != nil {
+		return fmt.Errorf("unable to convert string post id to int: %v", err)
+	}
+
+	var PostID int64
+	query := "SELECT id FROM posts WHERE id = $1"
+	err = s.Db.QueryRow(ctx, query, pid).Scan(&PostID)
+	// if err != nil {
+	// 	if err == sql.ErrNoRows {
+	// 		return fmt.Errorf("invalid post id: %v", err)
+	// 	}
+	// 	return fmt.Errorf("error while executing query: %v", err)
+	// }
+	if err == sql.ErrNoRows || err != nil {
+		// return fmt.Errorf("invalid post id: %v", err)
+		return ErrInvalidPostID
+	}
+
+	switch action {
+	case "removeUpvote":
+		query = "UPDATE posts SET upvotes = GREATEST(0, upvotes - 1) WHERE id = $1"
+	case "removeDownvote":
+		query = "UPDATE posts SET downvotes = GREATEST(0, downvotes - 1) WHERE id = $1"
+	case "upvote":
+		query = "UPDATE posts SET upvotes = upvotes + 1 WHERE id = $1"
+	case "downvote":
+		query = "UPDATE posts SET downvotes = downvotes + 1 WHERE id = $1"
+	}
+
+	tx, err := s.Db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("could not begin transaction: %v", err)
+	}
+
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, query, pid)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("unable to perform the query update action on post: %v", err)
+	}
+
+	var interactedPostsJSONB sql.NullString
+	query = "SELECT interacted_posts FROM users WHERE id = $1"
+	err = s.Db.QueryRow(ctx, query, uid).Scan(&interactedPostsJSONB)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("could not get interacted posts of user: %v", err)
+	}
+
+	var interactedPosts InteractedPosts
+	if err := json.Unmarshal([]byte(interactedPostsJSONB.String), &interactedPosts); err != nil {
+		return fmt.Errorf("error unmarshaling jsonb interacted posts data: %v", err)
+	}
+
+	switch action {
+	case "removeUpvote":
+		searchAndDelete(&interactedPosts.Upvotes, pid)
+	case "removeDownvote":
+		searchAndDelete(&interactedPosts.Downvotes, pid)
+	case "upvote":
+		searchAndAppend(&interactedPosts.Upvotes, pid)
+	case "downvote":
+		searchAndAppend(&interactedPosts.Downvotes, pid)
+	}
+
+	updatedInteractedPostsJSONB, err := json.Marshal(interactedPosts)
+	if err != nil {
+		return fmt.Errorf("unable to convert updateInteractedPosts to jsonb: %v", err)
+	}
+
+	query = "UPDATE users SET interacted_posts = $1 WHERE id = $2"
+	_, err = tx.Exec(ctx, query, updatedInteractedPostsJSONB, uid)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("unable to update interacted_posts in user table: %v", err)
+	}
+
+	tx.Commit(ctx)
+
+	return nil
 }

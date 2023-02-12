@@ -3,8 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"github.com/matryer/way"
+
 	"github.com/dhruvsingh510/bond_social_api/internal/service"
+	"github.com/matryer/way"
 )
 
 type createUserInput struct {
@@ -61,8 +62,6 @@ func (h *handler) user(w http.ResponseWriter, r *http.Request) {
 	respond(w, u, http.StatusOK)
 }
 
-
 func (h *handler) readUsers(w http.ResponseWriter, r *http.Request) {
 	h.ReadUsers(r.Context())
 }
-
