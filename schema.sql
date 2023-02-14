@@ -2,6 +2,7 @@ DROP DATABASE IF EXISTS bondsocial CASCADE;
 CREATE DATABASE IF NOT EXISTS bondsocial;
 SET DATABASE = bondsocial;
 
+
 DROP TABLE timeline;
 DROP TABLE posts;
 DROP TABLE users;
@@ -32,7 +33,7 @@ CREATE TABLE IF NOT EXISTS posts (
     poll JSONB
 );
 
-CREATE INDEX IF NOT EXISTS sorted_posts ON posts (created_at DESC);
+CREATE INDEX IF NOT EXISTS sorted_posts ON posts(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS timeline (
     id SERIAL NOT NULL PRIMARY KEY,
@@ -41,3 +42,12 @@ CREATE TABLE IF NOT EXISTS timeline (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS timeline_unique ON timeline(user_id, post_id);
+
+CREATE TABLE IF NOT EXISTS post_votes (
+    user_id INT NOT NULL REFERENCES users,
+    post_id INT NOT NULL REFERENCES posts,
+    vote_type VARCHAR NOT NULL,
+    PRIMARY KEY(user_id, post_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS post_votes_unique ON post_votes(user_id, post_id);

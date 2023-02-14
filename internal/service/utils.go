@@ -21,27 +21,27 @@ func checkPasswordHash(password string, hash string) bool {
     return err == nil
 }
 
-func searchAndAppend(arr *[]int, val int) {
-	found := false
-	for _, v := range *arr {
-		if v == val {
-			found = true
-			break
-		}
-	}
+// func searchAndAppend(arr *[]int, val int) {
+// 	found := false
+// 	for _, v := range *arr {
+// 		if v == val {
+// 			found = true
+// 			break
+// 		}
+// 	}
 
-	if !found {
-		*arr = append(*arr, val)
-	}
-} 
+// 	if !found {
+// 		*arr = append(*arr, val)
+// 	}
+// } 
 
-func searchAndDelete(arr *[]int, val int) {
-	for i, v := range *arr {
-		if v == val {
-			*arr = append((*arr)[:i], (*arr)[i+1:]...)
-			return
-		}
-	}
+// func searchAndDelete(arr *[]int, val int) {
+// 	for i, v := range *arr {
+// 		if v == val {
+// 			*arr = append((*arr)[:i], (*arr)[i+1:]...)
+// 			return
+// 		}
+// 	}
 
-	*arr = append(*arr, val)
-}
+// 	*arr = append(*arr, val)
+// }

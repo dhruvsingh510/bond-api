@@ -89,7 +89,7 @@ func (h *handler) post(w http.ResponseWriter, r *http.Request) {
 	respond(w, p, http.StatusOK)
 }
 
-func (h *handler) postEngagement(w http.ResponseWriter, r *http.Request) {
+func (h *handler) postVote(w http.ResponseWriter, r *http.Request) {
 	var in postEngagementInput
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -97,7 +97,7 @@ func (h *handler) postEngagement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.PostEngagement(r.Context(), in.PostID, in.Action)
+	err := h.PostVote(r.Context(), in.PostID, in.Action)
 
 	if err == service.ErrUnauthenticated {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -116,3 +116,4 @@ func (h *handler) postEngagement(w http.ResponseWriter, r *http.Request) {
 	
 	respond(w, "success", http.StatusNoContent)
 }
+

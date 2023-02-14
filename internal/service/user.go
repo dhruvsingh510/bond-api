@@ -33,8 +33,10 @@ type User struct {
 type UserProfile struct {
 	User            `json:"user,omitempty"`
 	Email           string `json:"email,omitempty"`
-	InteractedPosts `json:"interacted_posts,omitempty"`
+	// InteractedPosts `json:"interacted_posts,omitempty"`
 	Karma           int64 `json:"karma,omitempty"`
+	UpvotedPosts	[]int64 `json:"upvoted_posts,omitempty"`
+	DownvotedPosts	[]int64 `json:"downvoted_posts,omitempty"`
 }
 
 // Inserts a new user in the database
@@ -76,7 +78,7 @@ func (s *Service) CreateUser(ctx context.Context, email string, password string,
 }
 
 // User select on user from the database with the given username
-func (s *Service) User (ctx context.Context, username string) (UserProfile, error) {
+func (s *Service) User(ctx context.Context, username string) (UserProfile, error) {
 	var u UserProfile
 	
 	username = strings.TrimSpace(username)
@@ -85,6 +87,9 @@ func (s *Service) User (ctx context.Context, username string) (UserProfile, erro
 	}
 
 	uid, auth := ctx.Value(KeyAuthUserID).(int64)
+	if !auth {
+		return u, ErrUnauthenticated
+	}
 
 	query := "SELECT id, email, karma FROM users WHERE username = $1"
 	err := s.Db.QueryRow(ctx, query, username).Scan(&u.ID, &u.Email, &u.Karma)
@@ -96,12 +101,28 @@ func (s *Service) User (ctx context.Context, username string) (UserProfile, erro
 		return u, fmt.Errorf("could not query select user: %v", err)
 	}
 
-	u.Username = username
-	if !auth || uid != u.ID {
-		u.ID = 0
-		u.Email = ""
+	query = "SELECT post_id, vote_type FROM post_votes WHERE user_id = $1"
+	rows, err := s.Db.Query(ctx, query, uid)
+	if err != nil {
+		return u, fmt.Errorf("could not sql query user upvoted posts: %v", err)
 	}
 
+	defer rows.Close()
+
+	var postID int64
+	var voteType string
+	for rows.Next() {
+		if err := rows.Scan(&postID, &voteType); err != nil {
+			return u, fmt.Errorf("could not iterate over user posts: %v", err)
+		}
+
+		if voteType == "upvote" {
+			u.UpvotedPosts = append(u.UpvotedPosts, postID)
+		} else if voteType == "downvote" {
+			u.DownvotedPosts = append(u.DownvotedPosts, postID)
+		}
+	}
+	
 	return u, nil
 }
 
