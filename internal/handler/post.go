@@ -17,8 +17,14 @@ type createPostInput struct {
 }
 
 type postEngagementInput struct {
-	PostID string
+	PostID int64
 	Action string
+}
+
+type postCommentInput struct {
+	PostID int64
+	ParentCommentID int64
+	Comment string
 }
 
 func (h *handler) createPost(w http.ResponseWriter, r *http.Request) {
@@ -116,4 +122,34 @@ func (h *handler) postVote(w http.ResponseWriter, r *http.Request) {
 	
 	respond(w, "success", http.StatusNoContent)
 }
+
+func (h *handler) postComment(w http.ResponseWriter, r *http.Request) {
+	var in postCommentInput
+	defer r.Body.Close()
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := h.PostComment(r.Context(), in.PostID, in.ParentCommentID, in.Comment)
+
+	if err == service.ErrUnauthenticated {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if err == service.ErrInvalidPostID {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	
+	respond(w, "success", http.StatusNoContent)
+}
+
+
 

@@ -1,0 +1,21 @@
+sudo: required
+services:
+  - docker
+
+before_install:
+  - docker build -f Dockerfile.dev -t dhruvsingh510/bond-api .
+
+script:
+  - docker run  -e CI=true dhruvsingh510/bond-api go run test -- --coverage
+
+deploy:
+    provider: elasticbeanstalk
+    region: "ap-south-1"
+    app: "docker-react"
+    env: "docker-react-env"
+    bucket_name: "elasticbeanstalk-ap-south-1-678625286113"
+    bucket_path: "docker-react"
+    on:
+      branch: main
+    access_KEY_ID: $AWS_ACCESS_KEY
+    secret_access_key: "$AWS_SECRET_KEY"

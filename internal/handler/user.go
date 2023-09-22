@@ -62,6 +62,3 @@ func (h *handler) user(w http.ResponseWriter, r *http.Request) {
 	respond(w, u, http.StatusOK)
 }
 
-func (h *handler) readUsers(w http.ResponseWriter, r *http.Request) {
-	h.ReadUsers(r.Context())
-}

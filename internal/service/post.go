@@ -34,13 +34,6 @@ type Post struct {
 	User      *User          `json:"user,omitempty"`
 }
 
-type InteractedPosts struct {
-	Upvotes   []int `json:"upvotes,omitempty"`
-	Downvotes []int `json:"downvotes,omitempty"`
-	Comments  []int `json:"comments,omitempty"`
-	Saved     []int `json:"saved,omitempty"`
-}
-
 func (s *Service) CreatePost(
 	ctx context.Context,
 	title string,
@@ -71,10 +64,6 @@ func (s *Service) CreatePost(
 		return ti, ErrInvalidLink
 	}
 
-	// if body == "" && link == "" && album == "" && poll == "" {
-	// 	return ti, ErrNoContent
-	// }
-
 	var albumJSONB json.RawMessage
 	if album == "" {
 		albumJSONB = nil
@@ -86,10 +75,10 @@ func (s *Service) CreatePost(
 	}
 
 	var pollJSONB json.RawMessage
-	if album == "" {
+	if poll == "" {
 		pollJSONB = nil
 	} else {
-		err := json.Unmarshal([]byte(album), &pollJSONB)
+		err := json.Unmarshal([]byte(poll), &pollJSONB)
 		if err != nil {
 			return ti, fmt.Errorf("error converting poll string to jsonb: %v", err)
 		}
@@ -102,10 +91,27 @@ func (s *Service) CreatePost(
 
 	defer tx.Rollback(ctx)
 
-	query := "INSERT INTO posts (user_id, title, body, link, album, poll) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at"
-
-	if err = tx.QueryRow(ctx, query, uid, title, body, link, albumJSONB, pollJSONB).Scan(&ti.Post.ID, &ti.Post.CreatedAt); err != nil {
-		return ti, fmt.Errorf("could not insert post: %v", err)
+	var query string
+	if album == "" && poll == "" {
+		query = "INSERT INTO posts (user_id, title, body, link) VALUES ($1, $2, $3, $4) RETURNING id, created_at"
+		if err = tx.QueryRow(ctx, query, uid, title, body, link).Scan(&ti.Post.ID, &ti.Post.CreatedAt); err != nil {
+			return ti, fmt.Errorf("could not insert post: %v", err)
+		}
+	} else if album == "" {
+		query = "INSERT INTO posts (user_id, title, body, link, poll) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at"
+		if err = tx.QueryRow(ctx, query, uid, title, body, link, pollJSONB).Scan(&ti.Post.ID, &ti.Post.CreatedAt); err != nil {
+			return ti, fmt.Errorf("could not insert post: %v", err)
+		}
+	} else if poll == "" {
+		query = "INSERT INTO posts (user_id, title, body, link, album) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at"
+		if err = tx.QueryRow(ctx, query, uid, title, body, link, albumJSONB).Scan(&ti.Post.ID, &ti.Post.CreatedAt); err != nil {
+			return ti, fmt.Errorf("could not insert post: %v", err)
+		}
+	} else {
+		query = "INSERT INTO posts (user_id, title, body, link, album, poll) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at"
+		if err = tx.QueryRow(ctx, query, uid, title, body, link, albumJSONB, pollJSONB).Scan(&ti.Post.ID, &ti.Post.CreatedAt); err != nil {
+			return ti, fmt.Errorf("could not insert post: %v", err)
+		}
 	}
 
 	ti.Post.UserID = uid
@@ -113,26 +119,14 @@ func (s *Service) CreatePost(
 	ti.Post.Body = body
 	ti.Post.Link = link
 
+	ti.Post.Album.String = album
 	if album != "" {
-		ti.Post.Album = sql.NullString{
-			String: album,
-			Valid:  true,
-		}
-	} else {
-		ti.Post.Album = sql.NullString{
-			Valid: false,
-		}
-	}
+		ti.Post.Album.Valid = true
+	} 
 
+	ti.Post.Poll.String = poll
 	if poll != "" {
-		ti.Post.Poll = sql.NullString{
-			String: poll,
-			Valid:  true,
-		}
-	} else {
-		ti.Post.Poll = sql.NullString{
-			Valid: false,
-		}
+		ti.Post.Poll.Valid = true
 	}
 
 	query = "INSERT INTO timeline (user_id, post_id) VALUES ($1, $2) RETURNING id"
@@ -178,16 +172,6 @@ func (s *Service) Posts(
 		var post Post
 		if err := rows.Scan(&post.Title, &post.Body, &post.Link, &post.Album, &post.Poll); err != nil {
 			return nil, fmt.Errorf("could not iterate over user posts: %v", err)
-		}
-
-		if post.Album.String == "null" {
-			post.Album.String = ""
-			post.Album.Valid = false
-		}
-
-		if post.Poll.String == "null" {
-			post.Poll.String = ""
-			post.Poll.Valid = false
 		}
 
 		posts = append(posts, post)
@@ -237,7 +221,7 @@ func (s *Service) Post(
 
 func (s *Service) PostVote(
 	ctx context.Context,
-	postID string,
+	postID int64,
 	action string,
 ) error {
 
@@ -246,18 +230,7 @@ func (s *Service) PostVote(
 		return ErrUnauthenticated
 	}
 
-	pid, err := strconv.Atoi(postID)
-	if err != nil {
-		return fmt.Errorf("unable to convert string post id to int: %v", err)
-	}
-
-	var PostID int64
-	query := "SELECT id FROM posts WHERE id = $1"
-	err = s.Db.QueryRow(ctx, query, pid).Scan(&PostID)
-	if err != nil {
-		return ErrInvalidPostID
-	}
-
+	var query string 
 	switch action {
 	case "removeUpvote":
 		query = "UPDATE posts SET upvotes = GREATEST(0, upvotes - 1) WHERE id = $1"
@@ -276,60 +249,56 @@ func (s *Service) PostVote(
 
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, query, pid)
+	_, err = tx.Exec(ctx, query, postID)
 	if err != nil {
 		return fmt.Errorf("unable to perform the query update action on post: %v", err)
 	}
 
-	// var interactedPostsJSONB sql.NullString
-	// query = "SELECT interacted_posts FROM users WHERE id = $1"
-	// err = s.Db.QueryRow(ctx, query, uid).Scan(&interactedPostsJSONB)
-	// if err == sql.ErrNoRows {
-	// 	return fmt.Errorf("could not get interacted posts of user: %v", err)
-	// }
-
-	// var interactedPosts InteractedPosts
-	// if err := json.Unmarshal([]byte(interactedPostsJSONB.String), &interactedPosts); err != nil {
-	// 	return fmt.Errorf("error unmarshaling jsonb interacted posts data: %v", err)
-	// }
-
-	// switch action {
-	// case "removeUpvote":
-	// 	searchAndDelete(&interactedPosts.Upvotes, pid)
-	// case "removeDownvote":
-	// 	searchAndDelete(&interactedPosts.Downvotes, pid)
-	// case "upvote":
-	// 	searchAndAppend(&interactedPosts.Upvotes, pid)
-	// case "downvote":
-	// 	searchAndAppend(&interactedPosts.Downvotes, pid)
-	// }
-
-	// updatedInteractedPostsJSONB, err := json.Marshal(interactedPosts)
-	// if err != nil {
-	// 	return fmt.Errorf("unable to convert updateInteractedPosts to jsonb: %v", err)
-	// }
-
-	// query = "UPDATE users SET interacted_posts = $1 WHERE id = $2"
-	// _, err = tx.Exec(ctx, query, updatedInteractedPostsJSONB, uid)
-	// if err == sql.ErrNoRows {
-	// 	return fmt.Errorf("unable to update interacted_posts in user table: %v", err)
-	// }
-
 	if action == "removeUpvote" || action == "removeDownvote" {
 		query = "DELETE FROM post_votes WHERE user_id = $1 AND post_id = $2"
-		_, err = tx.Exec(ctx, query, uid, pid)
+		_, err = tx.Exec(ctx, query, uid, postID)
 		if err != nil {
 			return fmt.Errorf("unable to delete post vote: %v", err)
 		}
 	} else if action == "upvote" || action == "downvote" {
 		query = "INSERT INTO post_votes (user_id, post_id, vote_type) VALUES ($1, $2, $3)"
-		_, err = tx.Exec(ctx, query, uid, pid, action)
+		_, err = tx.Exec(ctx, query, uid, postID, action)
 		if err != nil {
 			return fmt.Errorf("unable to insert post vote: %v", err)
 		}
 	}
 
 	tx.Commit(ctx)
+
+	return nil
+}
+
+func (s *Service) PostComment (
+	ctx context.Context,
+	postID int64,
+	parentCommentID int64,
+	comment string,
+) (error) {
+	uid, auth := ctx.Value(KeyAuthUserID).(int64)
+	if !auth {
+		return ErrUnauthenticated
+	}
+
+	_ = uid
+
+	var query string
+	var err error
+	if parentCommentID != 0 {
+		query = "INSERT INTO post_comments (post_id, parent_id, content) VALUES ($1, $2, $3)"
+		_, err = s.Db.Exec(ctx, query, postID, parentCommentID, comment)
+	} else {
+		query = "INSERT INTO post_comments (post_id, content) VALUES ($1, $2)"
+		_, err = s.Db.Exec(ctx, query, postID, comment)
+	}
+	
+	if err != nil {
+		return fmt.Errorf("unable to insert comment: %v", err)
+	}
 
 	return nil
 }

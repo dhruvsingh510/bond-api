@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"encoding/json"
 )
 
 var (
@@ -33,7 +32,6 @@ type User struct {
 type UserProfile struct {
 	User            `json:"user,omitempty"`
 	Email           string `json:"email,omitempty"`
-	// InteractedPosts `json:"interacted_posts,omitempty"`
 	Karma           int64 `json:"karma,omitempty"`
 	UpvotedPosts	[]int64 `json:"upvoted_posts,omitempty"`
 	DownvotedPosts	[]int64 `json:"downvoted_posts,omitempty"`
@@ -56,10 +54,8 @@ func (s *Service) CreateUser(ctx context.Context, email string, password string,
 		return ErrHashingPass
 	}
 
-	var interactedPostsJSONB json.RawMessage = nil
-
-	query := "INSERT INTO users (email, password, username, interacted_posts) VALUES ($1, $2, $3, $4)"
-	_, err := s.Db.Exec(ctx, query, email, hash, username, interactedPostsJSONB)
+	query := "INSERT INTO users (email, password, username) VALUES ($1, $2, $3)"
+	_, err := s.Db.Exec(ctx, query, email, hash, username)
 	unique := isUniqueViolation(err)
 
 	if err != nil && !unique && strings.Contains(err.Error(), "email") {
@@ -126,27 +122,5 @@ func (s *Service) User(ctx context.Context, username string) (UserProfile, error
 	return u, nil
 }
 
-func (s *Service) ReadUsers(ctx context.Context) error {
-	query := "SELECT * FROM users"
-	rows, err := s.Db.Query(ctx, query)
-
-	if err != nil {
-		return fmt.Errorf("could not execute get users query: %v", err)
-	}
-
-	defer rows.Close()
-
-	for rows.Next() {
-		var username, password, email string
-		var id int
-		if err := rows.Scan(&id, &username, &email, &password); err != nil {
-			fmt.Printf("could not read users : %v", err)
-		}
-
-		fmt.Printf("id: %d\n username: %s\n email: %s\n password: %s\n---\n\n", id, username, email, password)
-	}
-
-	return nil
-}
 
  
